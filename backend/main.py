@@ -10,28 +10,21 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# -----------------------------
 # CORS
-# -----------------------------
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=[
+        "http://localhost:5173",
+        "https://samadhan-setu-eight.vercel.app"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# -----------------------------
-# Temporary in-memory database
-# -----------------------------
-
+# Temporary database
 complaints = {}
 
-
-# -----------------------------
-# Models
-# -----------------------------
 
 class ComplaintCreate(BaseModel):
     full_name: str
@@ -44,21 +37,13 @@ class ComplaintStatusUpdate(BaseModel):
     status: str
 
 
-# -----------------------------
-# Home API
-# -----------------------------
-
 @app.get("/")
 def home():
     return {
-        "message": "SamadhanSetu Backend is running 🚀",
+        "message": "SamadhanSetu Backend is Live 🚀",
         "status": "success"
     }
 
-
-# -----------------------------
-# Health Check
-# -----------------------------
 
 @app.get("/health")
 def health():
@@ -68,17 +53,19 @@ def health():
     }
 
 
-# -----------------------------
-# Register Complaint
-# -----------------------------
-
 @app.post("/complaints")
 def create_complaint(complaint: ComplaintCreate):
 
-    complaint_id = "SS-" + str(random.randint(100000, 999999))
+    complaint_id = (
+        "SS-" +
+        str(random.randint(100000, 999999))
+    )
 
     while complaint_id in complaints:
-        complaint_id = "SS-" + str(random.randint(100000, 999999))
+        complaint_id = (
+            "SS-" +
+            str(random.randint(100000, 999999))
+        )
 
     complaint_data = {
         "complaint_id": complaint_id,
@@ -99,10 +86,6 @@ def create_complaint(complaint: ComplaintCreate):
     }
 
 
-# -----------------------------
-# Track Complaint
-# -----------------------------
-
 @app.get("/complaints/{complaint_id}")
 def track_complaint(complaint_id: str):
 
@@ -120,10 +103,6 @@ def track_complaint(complaint_id: str):
     }
 
 
-# -----------------------------
-# Get All Complaints
-# -----------------------------
-
 @app.get("/complaints")
 def get_all_complaints():
 
@@ -133,10 +112,6 @@ def get_all_complaints():
         "complaints": list(complaints.values())
     }
 
-
-# -----------------------------
-# Admin Update Status
-# -----------------------------
 
 @app.put("/complaints/{complaint_id}/status")
 def update_complaint_status(
@@ -152,7 +127,9 @@ def update_complaint_status(
             "message": "Complaint not found"
         }
 
-    complaints[complaint_id]["status"] = status_update.status
+    complaints[complaint_id]["status"] = (
+        status_update.status
+    )
 
     return {
         "success": True,

@@ -1,40 +1,40 @@
 import { useEffect, useMemo, useState } from "react";
 import "./AdminDashboard.css";
 
-const API_URL = "http://127.0.0.1:8000";
+const API_URL = "https://samadhan-setu-vu3l.onrender.com";
+
+const statuses = [
+  "Submitted",
+  "Under Review",
+  "In Progress",
+  "Resolved",
+];
 
 function AdminDashboard() {
   const [complaints, setComplaints] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedComplaint, setSelectedComplaint] = useState(null);
   const [search, setSearch] = useState("");
-  const [filterStatus, setFilterStatus] = useState("All");
-  const [updatingId, setUpdatingId] = useState(null);
-
-  // -----------------------------
-  // Load complaints
-  // -----------------------------
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [selectedComplaint, setSelectedComplaint] =
+    useState(null);
+  const [updating, setUpdating] = useState(false);
+  const [error, setError] = useState("");
 
   const loadComplaints = async () => {
+    setLoading(true);
+    setError("");
+
     try {
-      setLoading(true);
-
       const response = await fetch(`${API_URL}/complaints`);
-
-      if (!response.ok) {
-        throw new Error("Failed to load complaints");
-      }
-
       const data = await response.json();
 
       if (data.success) {
         setComplaints(data.complaints || []);
+      } else {
+        setError("Unable to load complaints.");
       }
-    } catch (error) {
-      console.error(error);
-      alert(
-        "Could not connect to backend. Make sure FastAPI is running."
-      );
+    } catch (err) {
+      setError("Backend connection failed.");
     } finally {
       setLoading(false);
     }
@@ -44,14 +44,10 @@ function AdminDashboard() {
     loadComplaints();
   }, []);
 
-  // -----------------------------
-  // Update complaint status
-  // -----------------------------
+  const updateStatus = async (complaintId, status) => {
+    setUpdating(true);
 
-  const updateStatus = async (complaintId, newStatus) => {
     try {
-      setUpdatingId(complaintId);
-
       const response = await fetch(
         `${API_URL}/complaints/${complaintId}/status`,
         {
@@ -59,288 +55,181 @@ function AdminDashboard() {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            status: newStatus,
-          }),
+          body: JSON.stringify({ status }),
         }
       );
-
-      if (!response.ok) {
-        throw new Error("Status update failed");
-      }
 
       const data = await response.json();
 
       if (data.success) {
-        setComplaints((previous) =>
-          previous.map((complaint) =>
-            complaint.complaint_id === complaintId
+        setComplaints((prev) =>
+          prev.map((item) =>
+            item.complaint_id === complaintId
               ? data.complaint
-              : complaint
+              : item
           )
         );
 
         setSelectedComplaint(data.complaint);
+      } else {
+        alert(data.message || "Status update failed.");
       }
-    } catch (error) {
-      console.error(error);
-      alert("Unable to update complaint status.");
+    } catch (err) {
+      alert("Unable to connect to backend.");
     } finally {
-      setUpdatingId(null);
+      setUpdating(false);
     }
   };
 
-  // -----------------------------
-  // Search + filter
-  // -----------------------------
-
   const filteredComplaints = useMemo(() => {
     return complaints.filter((complaint) => {
-      const searchText = search.toLowerCase();
+      const text =
+        `${complaint.complaint_id} ${complaint.full_name} ${complaint.category} ${complaint.description}`
+          .toLowerCase();
 
-      const matchesSearch =
-        complaint.complaint_id
-          ?.toLowerCase()
-          .includes(searchText) ||
-        complaint.full_name
-          ?.toLowerCase()
-          .includes(searchText) ||
-        complaint.category
-          ?.toLowerCase()
-          .includes(searchText) ||
-        complaint.description
-          ?.toLowerCase()
-          .includes(searchText);
+      const matchesSearch = text.includes(
+        search.toLowerCase()
+      );
 
       const matchesStatus =
-        filterStatus === "All" ||
-        complaint.status === filterStatus;
+        statusFilter === "All" ||
+        complaint.status === statusFilter;
 
       return matchesSearch && matchesStatus;
     });
-  }, [complaints, search, filterStatus]);
+  }, [complaints, search, statusFilter]);
 
-  // -----------------------------
-  // Dashboard statistics
-  // -----------------------------
-
-  const total = complaints.length;
-
-  const submitted = complaints.filter(
-    (c) => c.status === "Submitted"
-  ).length;
-
-  const underReview = complaints.filter(
-    (c) => c.status === "Under Review"
-  ).length;
-
-  const inProgress = complaints.filter(
-    (c) => c.status === "In Progress"
-  ).length;
-
-  const resolved = complaints.filter(
-    (c) => c.status === "Resolved"
-  ).length;
-
-  // -----------------------------
-  // Logout
-  // -----------------------------
-
-  const handleLogout = () => {
-    window.location.href = "/";
+  const stats = {
+    total: complaints.length,
+    submitted: complaints.filter(
+      (c) => c.status === "Submitted"
+    ).length,
+    review: complaints.filter(
+      (c) => c.status === "Under Review"
+    ).length,
+    progress: complaints.filter(
+      (c) => c.status === "In Progress"
+    ).length,
+    resolved: complaints.filter(
+      (c) => c.status === "Resolved"
+    ).length,
   };
 
   return (
     <div className="admin-page">
 
-      {/* ================= HEADER ================= */}
-
       <header className="admin-header">
-
-        <div className="admin-brand">
-          <div className="admin-logo">🇮🇳</div>
-
-          <div>
-            <h2>SamadhanSetu</h2>
-            <span>Administration Portal</span>
-          </div>
+        <div>
+          <h1>SamadhanSetu Admin</h1>
+          <p>Complaint Management Dashboard</p>
         </div>
 
-        <div className="admin-header-right">
-          <div className="admin-user">
-            <div className="admin-avatar">A</div>
-
-            <div>
-              <strong>Administrator</strong>
-              <span>System Admin</span>
-            </div>
-          </div>
+        <div className="admin-user">
+          <button onClick={loadComplaints}>
+            🔄 Refresh
+          </button>
 
           <button
-            className="logout-btn"
-            onClick={handleLogout}
+            onClick={() => {
+              window.location.href = "/";
+            }}
           >
             Logout
           </button>
         </div>
-
       </header>
 
-      {/* ================= MAIN ================= */}
+      <main className="admin-content">
 
-      <main className="admin-main">
-
-        {/* Page title */}
-
-        <div className="admin-title">
-
-          <div>
-            <span className="admin-label">
-              ADMIN CONTROL CENTER
-            </span>
-
-            <h1>Complaint Dashboard</h1>
-
-            <p>
-              Monitor, review and manage citizen complaints.
-            </p>
-          </div>
-
-          <button
-            className="refresh-btn"
-            onClick={loadComplaints}
-          >
-            🔄 Refresh
-          </button>
-
-        </div>
-
-        {/* ================= STATS ================= */}
-
+        {/* STATS */}
         <div className="stats-grid">
 
           <div className="stat-card">
-            <div className="stat-icon">📋</div>
-
-            <div>
-              <span>Total Complaints</span>
-              <strong>{total}</strong>
-            </div>
+            <span>Total</span>
+            <strong>{stats.total}</strong>
           </div>
 
           <div className="stat-card">
-            <div className="stat-icon">📨</div>
-
-            <div>
-              <span>Submitted</span>
-              <strong>{submitted}</strong>
-            </div>
+            <span>Submitted</span>
+            <strong>{stats.submitted}</strong>
           </div>
 
           <div className="stat-card">
-            <div className="stat-icon">🔍</div>
-
-            <div>
-              <span>Under Review</span>
-              <strong>{underReview}</strong>
-            </div>
+            <span>Under Review</span>
+            <strong>{stats.review}</strong>
           </div>
 
           <div className="stat-card">
-            <div className="stat-icon">⚙️</div>
-
-            <div>
-              <span>In Progress</span>
-              <strong>{inProgress}</strong>
-            </div>
+            <span>In Progress</span>
+            <strong>{stats.progress}</strong>
           </div>
 
           <div className="stat-card">
-            <div className="stat-icon">✅</div>
-
-            <div>
-              <span>Resolved</span>
-              <strong>{resolved}</strong>
-            </div>
+            <span>Resolved</span>
+            <strong>{stats.resolved}</strong>
           </div>
 
         </div>
 
-        {/* ================= TABLE ================= */}
-
+        {/* COMPLAINTS */}
         <section className="complaints-panel">
 
-          <div className="panel-header">
-
+          <div className="panel-heading">
             <div>
-              <h2>Citizen Complaints</h2>
+              <h2>Complaints</h2>
               <p>
-                Review and update complaint status.
+                Manage citizen complaints from one place.
               </p>
             </div>
-
-            <div className="panel-count">
-              {filteredComplaints.length} results
-            </div>
-
           </div>
-
-          {/* Filters */}
 
           <div className="filters">
 
-            <div className="search-box">
-              🔎
-
-              <input
-                type="text"
-                placeholder="Search Complaint ID, name, category..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
+            <input
+              className="search-box"
+              type="text"
+              placeholder="Search complaint..."
+              value={search}
+              onChange={(e) =>
+                setSearch(e.target.value)
+              }
+            />
 
             <select
-              value={filterStatus}
+              value={statusFilter}
               onChange={(e) =>
-                setFilterStatus(e.target.value)
+                setStatusFilter(e.target.value)
               }
             >
               <option value="All">All Status</option>
-              <option value="Submitted">Submitted</option>
-              <option value="Under Review">Under Review</option>
-              <option value="In Progress">In Progress</option>
-              <option value="Resolved">Resolved</option>
+
+              {statuses.map((status) => (
+                <option
+                  key={status}
+                  value={status}
+                >
+                  {status}
+                </option>
+              ))}
             </select>
 
           </div>
 
-          {/* Loading */}
+          {error && (
+            <div className="error-message">
+              {error}
+            </div>
+          )}
 
           {loading ? (
-
-            <div className="empty-state">
-              <div className="loading-spinner"></div>
-              <h3>Loading complaints...</h3>
-              <p>Connecting to SamadhanSetu backend.</p>
+            <div className="loading">
+              Loading complaints...
             </div>
-
           ) : filteredComplaints.length === 0 ? (
-
             <div className="empty-state">
-
-              <div className="empty-icon">📭</div>
-
-              <h3>No complaints found</h3>
-
-              <p>
-                New citizen complaints will appear here.
-              </p>
-
+              No complaints found.
             </div>
-
           ) : (
-
             <div className="table-wrapper">
 
               <table>
@@ -348,10 +237,8 @@ function AdminDashboard() {
                 <thead>
                   <tr>
                     <th>Complaint ID</th>
-                    <th>Citizen</th>
+                    <th>Name</th>
                     <th>Category</th>
-                    <th>Description</th>
-                    <th>Date</th>
                     <th>Status</th>
                     <th>Action</th>
                   </tr>
@@ -359,254 +246,148 @@ function AdminDashboard() {
 
                 <tbody>
 
-                  {filteredComplaints.map((complaint) => (
+                  {filteredComplaints.map(
+                    (complaint) => (
+                      <tr key={complaint.complaint_id}>
 
-                    <tr key={complaint.complaint_id}>
+                        <td>
+                          <strong>
+                            {complaint.complaint_id}
+                          </strong>
+                        </td>
 
-                      <td>
-                        <strong className="complaint-id">
-                          {complaint.complaint_id}
-                        </strong>
-                      </td>
+                        <td>
+                          {complaint.full_name}
+                        </td>
 
-                      <td>
-                        <div className="citizen-cell">
-                          <div className="citizen-avatar">
-                            {complaint.full_name
-                              ?.charAt(0)
-                              .toUpperCase()}
-                          </div>
-
-                          <div>
-                            <strong>
-                              {complaint.full_name}
-                            </strong>
-
-                            <span>
-                              {complaint.mobile}
-                            </span>
-                          </div>
-                        </div>
-                      </td>
-
-                      <td>
-                        <span className="category-badge">
+                        <td>
                           {complaint.category}
-                        </span>
-                      </td>
+                        </td>
 
-                      <td>
-                        <div className="description-cell">
-                          {complaint.description}
-                        </div>
-                      </td>
+                        <td>
+                          <span className="status-badge">
+                            {complaint.status}
+                          </span>
+                        </td>
 
-                      <td>
-                        <span className="date-cell">
-                          {new Date(
-                            complaint.created_at
-                          ).toLocaleDateString()}
-                        </span>
-                      </td>
+                        <td>
+                          <button
+                            className="view-btn"
+                            onClick={() =>
+                              setSelectedComplaint(
+                                complaint
+                              )
+                            }
+                          >
+                            View
+                          </button>
+                        </td>
 
-                      <td>
-                        <span
-                          className={`status-badge status-${complaint.status
-                            .toLowerCase()
-                            .replaceAll(" ", "-")}`}
-                        >
-                          {complaint.status}
-                        </span>
-                      </td>
-
-                      <td>
-
-                        <button
-                          className="view-btn"
-                          onClick={() =>
-                            setSelectedComplaint(complaint)
-                          }
-                        >
-                          View
-                        </button>
-
-                      </td>
-
-                    </tr>
-
-                  ))}
+                      </tr>
+                    )
+                  )}
 
                 </tbody>
 
               </table>
 
             </div>
-
           )}
 
         </section>
-
       </main>
 
-      {/* ================= DETAIL MODAL ================= */}
-
+      {/* MODAL */}
       {selectedComplaint && (
+        <div
+          className="modal-overlay"
+          onClick={() =>
+            setSelectedComplaint(null)
+          }
+        >
 
-        <div className="admin-modal-overlay">
-
-          <div className="admin-modal">
+          <div
+            className="admin-modal"
+            onClick={(e) =>
+              e.stopPropagation()
+            }
+          >
 
             <button
-              className="admin-close"
+              className="close-btn"
               onClick={() =>
                 setSelectedComplaint(null)
               }
             >
-              ✕
+              ×
             </button>
 
-            <div className="detail-heading">
+            <h2>
+              Complaint Details
+            </h2>
 
-              <span>COMPLAINT DETAILS</span>
-
-              <h2>
-                {selectedComplaint.complaint_id}
-              </h2>
+            <div className="detail-section">
 
               <p>
-                Submitted on{" "}
-                {new Date(
-                  selectedComplaint.created_at
-                ).toLocaleString()}
+                <strong>ID:</strong>{" "}
+                {selectedComplaint.complaint_id}
+              </p>
+
+              <p>
+                <strong>Name:</strong>{" "}
+                {selectedComplaint.full_name}
+              </p>
+
+              <p>
+                <strong>Mobile:</strong>{" "}
+                {selectedComplaint.mobile}
+              </p>
+
+              <p>
+                <strong>Category:</strong>{" "}
+                {selectedComplaint.category}
+              </p>
+
+              <p>
+                <strong>Description:</strong>{" "}
+                {selectedComplaint.description}
+              </p>
+
+              <p>
+                <strong>Current Status:</strong>{" "}
+                {selectedComplaint.status}
               </p>
 
             </div>
 
-            {/* Citizen */}
+            <h3>Update Status</h3>
 
-            <div className="detail-section">
+            <div className="status-actions">
 
-              <h3>👤 Citizen Information</h3>
-
-              <div className="detail-grid">
-
-                <div>
-                  <span>Full Name</span>
-                  <strong>
-                    {selectedComplaint.full_name}
-                  </strong>
-                </div>
-
-                <div>
-                  <span>Mobile Number</span>
-                  <strong>
-                    {selectedComplaint.mobile}
-                  </strong>
-                </div>
-
-              </div>
-
-            </div>
-
-            {/* Complaint */}
-
-            <div className="detail-section">
-
-              <h3>📝 Complaint Information</h3>
-
-              <div className="detail-grid">
-
-                <div>
-                  <span>Category</span>
-                  <strong>
-                    {selectedComplaint.category}
-                  </strong>
-                </div>
-
-                <div>
-                  <span>Current Status</span>
-
-                  <span
-                    className={`status-badge status-${selectedComplaint.status
-                      .toLowerCase()
-                      .replaceAll(" ", "-")}`}
-                  >
-                    {selectedComplaint.status}
-                  </span>
-                </div>
-
-              </div>
-
-              <div className="full-detail">
-
-                <span>Problem Description</span>
-
-                <p>
-                  {selectedComplaint.description}
-                </p>
-
-              </div>
-
-            </div>
-
-            {/* Status */}
-
-            <div className="detail-section">
-
-              <h3>⚙️ Update Complaint Status</h3>
-
-              <div className="status-actions">
-
-                {[
-                  "Submitted",
-                  "Under Review",
-                  "In Progress",
-                  "Resolved",
-                ].map((status) => (
-
-                  <button
-                    key={status}
-                    disabled={
-                      updatingId ===
-                      selectedComplaint.complaint_id
-                    }
-                    className={
-                      selectedComplaint.status === status
-                        ? "active-status"
-                        : ""
-                    }
-                    onClick={() =>
-                      updateStatus(
-                        selectedComplaint.complaint_id,
-                        status
-                      )
-                    }
-                  >
-                    {status === "Submitted" && "📨"}
-                    {status === "Under Review" && "🔍"}
-                    {status === "In Progress" && "⚙️"}
-                    {status === "Resolved" && "✅"}
-
-                    <span>{status}</span>
-                  </button>
-
-                ))}
-
-              </div>
-
-              {updatingId ===
-                selectedComplaint.complaint_id && (
-                <p className="updating-text">
-                  Updating status...
-                </p>
-              )}
+              {statuses.map((status) => (
+                <button
+                  key={status}
+                  disabled={updating}
+                  className={
+                    selectedComplaint.status === status
+                      ? "active-status"
+                      : ""
+                  }
+                  onClick={() =>
+                    updateStatus(
+                      selectedComplaint.complaint_id,
+                      status
+                    )
+                  }
+                >
+                  {status}
+                </button>
+              ))}
 
             </div>
 
           </div>
-
         </div>
-
       )}
 
     </div>
